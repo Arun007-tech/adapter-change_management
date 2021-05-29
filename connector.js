@@ -170,11 +170,11 @@ class ServiceNowConnector {
    *   Will be HTML text if hibernating instance.
    * @param {error} callback.error - The error property of callback.
    */
-  get(callback) {
+  get(callOptions,callback) {
     let getCallOptions = { ...this.options };
     getCallOptions.method = 'GET';
     getCallOptions.query = 'sysparm_limit=1';
-    this.sendRequest(getCallOptions, (results, error) => this.iapCallback(results, error));
+    this.sendRequest(getCallOptions, (results, error) => callback(results, error));
   }
 
   /**
@@ -189,10 +189,10 @@ class ServiceNowConnector {
  *   Will be HTML text if hibernating instance.
  * @param {error} callback.error - The error property of callback.
  */
- post(callback) {
+ post(callOptions,callback) {
    let getCallOptions = { ...this.options };
     getCallOptions.method = 'POST';
-  this.sendRequest(getCallOptions, (responseData, errorMessage) => iapCallback(responseData, errorMessage));
+  this.sendRequest(getCallOptions, (responseData, errorMessage) => callback(responseData, errorMessage));
 }
 
 }
