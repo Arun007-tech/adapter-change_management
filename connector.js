@@ -29,41 +29,58 @@ class ServiceNowConnector {
   }
 
   /**
- * @method constructUri
- * @memberof ServiceNowConnector
- * @description Build and return the proper URI by appending an optionally passed
- *   [URL query string]{@link https://en.wikipedia.org/wiki/Query_string}.
- *
- * @param {string} serviceNowTable - The table target of the ServiceNow table API.
- * @param {string} [query] - Optional URL query string.
- *
- * @return {string} ServiceNow URL
- */
- constructUri(serviceNowTable, query = null) {
-  let uri = `/api/now/table/${serviceNowTable}`;
-  if (query) {
-    uri = uri + '?' + query;
-  }
-  return uri;
-}
+   * @callback iapCallback
+   * @description A [callback function]{@link
+   *   https://developer.mozilla.org/en-US/docs/Glossary/Callback_function}
+   *   is a function passed into another function as an argument, which is
+   *   then invoked inside the outer function to complete some kind of
+   *   routine or action.
+   *
+   * @param {*} responseData - When no errors are caught, return data as a
+   *   single argument to callback function.
+   * @param {error} [errorMessage] - If an error is caught, return error
+   *   message in optional second argument to callback function.
+   */
 
-/**
- * @function isHibernating
+
+   /**
+ * @memberOf ServiceNowConnector
+ * @method isHibernating
  * @description Checks if request function responded with evidence of
  *   a hibernating ServiceNow instance.
- *
  * @param {object} response - The response argument passed by the request function in its callback.
- *
  * @return {boolean} Returns true if instance is hibernating. Otherwise returns false.
  */
- isHibernating(response) {
+isHibernating(response) {
+  //console.log(`StatusCode: ` + response.statusCode);
+  //console.log(`Response Body: ` + response.body)
   return response.body.includes('Instance Hibernating page')
   && response.body.includes('<html>')
   && response.statusCode === 200;
 }
 
-/**
- * @function processRequestResults
+  /**
+  * @memberof ServiceNowConnector
+  * @method constructUri
+  * @description Build and return the proper URI by appending an optionally passed
+  *   [URL query string]{@link https://en.wikipedia.org/wiki/Query_string}.
+  *
+  * @param {string} serviceNowTable - The table target of the ServiceNow table API.
+  * @param {string} [query] - Optional URL query string.
+  *
+  * @return {string} ServiceNow URL
+  */
+  constructUri(serviceNowTable, query = null) {
+    let uri = `/api/now/table/${serviceNowTable}`;
+    if (query) {
+      uri = uri + '?' + query;
+    }
+    return uri;
+  }
+
+  /**
+ * @memberOf ServiceNowConnector
+ * @method processRequestResults
  * @description Inspect ServiceNow API response for an error, bad response code, or
  *   a hibernating instance. If any of those conditions are detected, return an error.
  *   Else return the API's response.
@@ -76,7 +93,7 @@ class ServiceNowConnector {
  *   Will be HTML text if hibernating instance.
  * @param {error} callback.error - The error property of callback.
  */
- processRequestResults(error, response, body, callback) {
+processRequestResults(error, response, body, callback) {
   /**
    * You must build the contents of this function.
    * Study your package and note which parts of the get()
@@ -85,23 +102,30 @@ class ServiceNowConnector {
    * This function must not check for a hibernating instance;
    * it must call function isHibernating.
    */
+    let callbackData = null;
+    let callbackError = null;
+    
     if (error) {
       console.error('Error present.');
-      callback.error = error;
+      callbackError = error;
+      callback(callbackData, callbackError);       
     } else if (!validResponseRegex.test(response.statusCode)) {
       console.error('Bad response code.');
-      callback.error = response;
-    } else if (this.isHibernating(response)) {
-      callback.error = 'Service Now instance is hibernating';
+      callbackError = response;
+      callback(callbackData, callbackError);       
+    } else if (this.isHibernating(response) == true) {
+      callbackError = 'Service Now instance is hibernating';
+      callback(callbackData, callbackError);      
       console.error(callbackError);
     } else {
-      callback.data = response;
-    }
-    return callback(callback.data, callback.error);
+      callbackData = response;
+      callback(callbackData, callbackError);
+  };
 }
 
 /**
- * @function sendRequest
+ * @memberOf serviceNowConnector
+ * @method sendRequest
  * @description Builds final options argument for request function
  *   from global const options and parameter callOptions.
  *   Executes request call, then verifies response.
@@ -115,7 +139,7 @@ class ServiceNowConnector {
  *   Will be HTML text if hibernating instance.
  * @param {error} callback.error - The error property of callback.
  */
- sendRequest(callOptions, callback) {
+sendRequest(callOptions, callback) {
   // Initialize return arguments for callback
   let uri;
   if (callOptions.query)
@@ -129,32 +153,21 @@ class ServiceNowConnector {
    * hardcoded values.
    */
   const requestOptions = {
-       method: callOptions.method,
-    auth: {
-      user: this.options.username,
-      pass: this.options.password,
-    },
-    baseUrl: this.options.url,
-    uri: uri ,
+      method: callOptions.method,
+      auth: {
+        user: callOptions.username,
+        pass: callOptions.password,
+      },
+      baseUrl: callOptions.url,
+      uri: uri,
   };
+    //console.log(requestOptions);
+
+  //console.log(`method: ` + callOptions.method)
   request(requestOptions, (error, response, body) => {
     this.processRequestResults(error, response, body, (processedResults, processedError) => callback(processedResults, processedError));
   });
 }
-
-  /**
-   * @callback iapCallback
-   * @description A [callback function]{@link
-   *   https://developer.mozilla.org/en-US/docs/Glossary/Callback_function}
-   *   is a function passed into another function as an argument, which is
-   *   then invoked inside the outer function to complete some kind of
-   *   routine or action.
-   *
-   * @param {*} responseData - When no errors are caught, return data as a
-   *   single argument to callback function.
-   * @param {error} [errorMessage] - If an error is caught, return error
-   *   message in optional second argument to callback function.
-   */
 
   /**
    * @memberof ServiceNowConnector
@@ -170,15 +183,17 @@ class ServiceNowConnector {
    *   Will be HTML text if hibernating instance.
    * @param {error} callback.error - The error property of callback.
    */
-  get(callOptions,callback) {
-    let getCallOptions = { ...this.options };
+  get(callback) {
+    let getCallOptions = this.options;
     getCallOptions.method = 'GET';
     getCallOptions.query = 'sysparm_limit=1';
     this.sendRequest(getCallOptions, (results, error) => callback(results, error));
   }
 
-  /**
- * @function post
+
+/**
+ * @memberOf serviceNowConnector
+ * @method post
  * @description Call the ServiceNow POST API. Sets the API call's method,
  *   then calls sendRequest().
  *
@@ -189,10 +204,10 @@ class ServiceNowConnector {
  *   Will be HTML text if hibernating instance.
  * @param {error} callback.error - The error property of callback.
  */
- post(callOptions,callback) {
-   let getCallOptions = { ...this.options };
-    getCallOptions.method = 'POST';
-  this.sendRequest(getCallOptions, (responseData, errorMessage) => callback(responseData, errorMessage));
+post(callback) {
+  let getCallOptions = this.options;
+  getCallOptions.method = 'POST';
+  this.sendRequest(getCallOptions, (results, error) => callback(results, error));
 }
 
 }
